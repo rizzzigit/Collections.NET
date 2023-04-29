@@ -4,93 +4,85 @@ namespace RizzziGit.Collections;
 
 public class WaitQueue<T>
 {
-  private class LockableObject
-  {
-    public LockableObject()
-    {
-      Backlog = new();
-      DequeueWaiters = new();
-      EnqueueWaiters = new();
-    }
-
-    public ConcurrentQueue<T> Backlog;
-    public ConcurrentQueue<TaskCompletionSource<T>> DequeueWaiters;
-    public ConcurrentQueue<TaskCompletionSource<TaskCompletionSource<T>>> EnqueueWaiters;
-  }
-
   public WaitQueue() : this(null) { }
   public WaitQueue(int? capacity)
   {
     Capacity = capacity;
-    LockObject = new();
+    Mutex = new();
+
+    Backlog = new();
+    DequeueWaiters = new();
+    EnqueueWaiters = new();
   }
 
   private int? Capacity;
-  private LockableObject? LockObject;
+  private Mutex? Mutex;
 
-  public int Count => LockObject?.Backlog.Count ?? throw new ObjectDisposedException(typeof(LockableObject).Name);
+  private ConcurrentQueue<T> Backlog;
+  private ConcurrentQueue<TaskCompletionSource<T>> DequeueWaiters;
+  private ConcurrentQueue<TaskCompletionSource<TaskCompletionSource<T>>> EnqueueWaiters;
+
+  public int Count => Mutex != null ? Backlog.Count : throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
 
   public void Dispose(Exception? exception = null)
   {
-    if (LockObject == null)
+    if (Mutex == null)
     {
-      throw new ObjectDisposedException(typeof(LockableObject).Name);
+      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
     }
 
-    lock (LockObject)
+    Mutex mutex = Mutex;
+    Mutex = null;
+
+    mutex.WaitOne();
+    while (DequeueWaiters.TryDequeue(out TaskCompletionSource<T>? dequeueWaiter))
     {
-      LockableObject lockObject = LockObject;
-      LockObject = null;
-
-      while (lockObject.DequeueWaiters.TryDequeue(out TaskCompletionSource<T>? dequeueWaiter))
+      if (exception != null)
       {
-        if (exception != null)
-        {
-          dequeueWaiter.SetException(exception);
-        }
-        else
-        {
-          dequeueWaiter.SetCanceled();
-        }
+        dequeueWaiter.SetException(exception);
       }
-
-      while (lockObject.EnqueueWaiters.TryDequeue(out TaskCompletionSource<TaskCompletionSource<T>>? enqueueWaiter))
+      else
       {
-        if (exception != null)
-        {
-          enqueueWaiter.SetException(exception);
-        }
-        else
-        {
-          enqueueWaiter.SetCanceled();
-        }
+        dequeueWaiter.SetCanceled();
       }
     }
+
+    while (EnqueueWaiters.TryDequeue(out TaskCompletionSource<TaskCompletionSource<T>>? enqueueWaiter))
+    {
+      if (exception != null)
+      {
+        enqueueWaiter.SetException(exception);
+      }
+      else
+      {
+        enqueueWaiter.SetCanceled();
+      }
+    }
+    mutex.Close();
   }
 
   public Task<T> DequeueAsync()
   {
     TaskCompletionSource<T> source = new();
-    if (LockObject == null)
+    if (Mutex == null)
     {
-      throw new ObjectDisposedException(typeof(LockableObject).Name);
+      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
     }
 
-    lock (LockObject)
+    Mutex.WaitOne();
+    if (Backlog.TryDequeue(out T? result) && (result != null))
     {
-      if (LockObject.Backlog.TryDequeue(out T? result) && (result != null))
-      {
-        source.SetResult(result);
-      }
-      else if (LockObject.EnqueueWaiters.TryDequeue(out TaskCompletionSource<TaskCompletionSource<T>>? enqueueWaiter) && (enqueueWaiter != null))
-      {
-        enqueueWaiter.SetResult(source);
-      }
-      else
-      {
-        LockObject.DequeueWaiters.Enqueue(source);
-      }
+      source.SetResult(result);
     }
+    else if (EnqueueWaiters.TryDequeue(out TaskCompletionSource<TaskCompletionSource<T>>? enqueueWaiter) && (enqueueWaiter != null))
+    {
+      enqueueWaiter.SetResult(source);
+    }
+    else
+    {
+      DequeueWaiters.Enqueue(source);
+    }
+    Mutex.ReleaseMutex();
 
     return source.Task;
   }
@@ -99,26 +91,25 @@ public class WaitQueue<T>
   {
     TaskCompletionSource<TaskCompletionSource<T>>? enqueueSource = null;
 
-    if (LockObject == null)
+    if (Mutex == null)
     {
-      throw new ObjectDisposedException(typeof(LockableObject).Name);
+      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
     }
 
-    lock (LockObject)
+    Mutex.WaitOne();
+    if (DequeueWaiters.TryDequeue(out TaskCompletionSource<T>? result) && (result != null))
     {
-      if (LockObject.DequeueWaiters.TryDequeue(out TaskCompletionSource<T>? result) && (result != null))
-      {
-        result.SetResult(item);
-      }
-      else if ((Capacity != null) && (LockObject.Backlog.Count >= Capacity))
-      {
-        LockObject.EnqueueWaiters.Enqueue(enqueueSource = new());
-      }
-      else
-      {
-        LockObject.Backlog.Enqueue(item);
-      }
+      result.SetResult(item);
     }
+    else if ((Capacity != null) && (Backlog.Count >= Capacity))
+    {
+      EnqueueWaiters.Enqueue(enqueueSource = new());
+    }
+    else
+    {
+      Backlog.Enqueue(item);
+    }
+    Mutex.ReleaseMutex();
 
     if (enqueueSource != null)
     {

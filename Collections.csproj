@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RizzziGit.Collections</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <SelfContained>false</SelfContained>
+    <DebugType>None</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugType>Embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>RizzziGit.Collections</PackageId>
+
+    <AssemblyTitle>RizzziGit.Collections</AssemblyTitle>
+    <Description>Extra collection implementations for .NET.</Description>
+    <Product>Collections</Product>
+    <Authors>RizzziGit</Authors>
+    <Version>1.0.1</Version>
+
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <FileVersion>1.0.1</FileVersion>
+    <RepositoryUrl>https://github.com/RizzziGit/Collections.NET</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Add optional exception argument on Dispose()</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

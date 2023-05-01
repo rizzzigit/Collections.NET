@@ -7,7 +7,7 @@ public class WaitQueue<T>
   public WaitQueue() : this(null) { }
   public WaitQueue(int? capacity)
   {
-    Capacity = capacity;
+    Capacity = capacity ?? -1;
     Mutex = new();
 
     Backlog = new();
@@ -15,13 +15,13 @@ public class WaitQueue<T>
     EnqueueWaiters = new();
   }
 
-  private int? Capacity;
   private Mutex? Mutex;
 
   private ConcurrentQueue<T> Backlog;
   private ConcurrentQueue<TaskCompletionSource<T>> DequeueWaiters;
   private ConcurrentQueue<TaskCompletionSource<TaskCompletionSource<T>>> EnqueueWaiters;
 
+  public int Capacity { get; private set; }
   public int Count => Mutex != null ? Backlog.Count : throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
 
   public void Dispose(Exception? exception = null)
@@ -102,7 +102,7 @@ public class WaitQueue<T>
     {
       result.SetResult(item);
     }
-    else if ((Capacity != null) && (Backlog.Count >= Capacity))
+    else if ((Capacity >= 0) && (Backlog.Count >= Capacity))
     {
       EnqueueWaiters.Enqueue(enqueueSource = new());
     }

@@ -32,13 +32,19 @@ public class WaitQueue<T>
 
   public int Capacity { get; private set; }
   public int Count => Mutex != null ? Backlog.Count : throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
-
-  public void Dispose(Exception? exception = null)
+  public bool HasPending
   {
-    if (Mutex == null)
+    get
     {
-      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
+      Mutex mutex = GetMutex();
+
+      mutex.WaitOne();
+      bool result = Count != 0 || EnqueueWaiters.Count != 0;
+      mutex.ReleaseMutex();
+
+      return result;
     }
+  }
 
   public void Dispose(Exception? exception = null)
   {

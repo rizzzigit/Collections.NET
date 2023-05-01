@@ -59,6 +59,7 @@ public class WaitQueue<T>
       }
     }
     mutex.Close();
+    Backlog.Clear();
   }
 
   public Task<T> DequeueAsync()

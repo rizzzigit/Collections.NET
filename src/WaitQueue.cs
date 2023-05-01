@@ -16,6 +16,15 @@ public class WaitQueue<T>
   }
 
   private Mutex? Mutex;
+  private Mutex GetMutex()
+  {
+    if (Mutex == null)
+    {
+      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
+    };
+
+    return Mutex;
+  }
 
   private ConcurrentQueue<T> Backlog;
   private ConcurrentQueue<TaskCompletionSource<T>> DequeueWaiters;
@@ -31,7 +40,9 @@ public class WaitQueue<T>
       throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
     }
 
-    Mutex mutex = Mutex;
+  public void Dispose(Exception? exception = null)
+  {
+    Mutex mutex = GetMutex();
     Mutex = null;
 
     mutex.WaitOne();
@@ -64,13 +75,10 @@ public class WaitQueue<T>
 
   public Task<T> DequeueAsync()
   {
+    Mutex mutex = GetMutex();
     TaskCompletionSource<T> source = new();
-    if (Mutex == null)
-    {
-      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
-    }
 
-    Mutex.WaitOne();
+    mutex.WaitOne();
     if (Backlog.TryDequeue(out T? result) && (result != null))
     {
       source.SetResult(result);
@@ -83,21 +91,17 @@ public class WaitQueue<T>
     {
       DequeueWaiters.Enqueue(source);
     }
-    Mutex.ReleaseMutex();
+    mutex.ReleaseMutex();
 
     return source.Task;
   }
 
   public async Task EnqueueAsync(T item)
   {
+    Mutex mutex = GetMutex();
     TaskCompletionSource<TaskCompletionSource<T>>? enqueueSource = null;
 
-    if (Mutex == null)
-    {
-      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
-    }
-
-    Mutex.WaitOne();
+    mutex.WaitOne();
     if (DequeueWaiters.TryDequeue(out TaskCompletionSource<T>? result) && (result != null))
     {
       result.SetResult(item);
@@ -110,7 +114,7 @@ public class WaitQueue<T>
     {
       Backlog.Enqueue(item);
     }
-    Mutex.ReleaseMutex();
+    mutex.ReleaseMutex();
 
     if (enqueueSource != null)
     {

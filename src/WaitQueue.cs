@@ -31,18 +31,25 @@ public class WaitQueue<T>
   private ConcurrentQueue<TaskCompletionSource<TaskCompletionSource<T>>> EnqueueWaiters;
 
   public int Capacity { get; private set; }
-  public int Count => Mutex != null ? Backlog.Count : throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
+  public int Count => Mutex != null ? Backlog.Count : 0;
   public bool HasPending
   {
     get
     {
-      Mutex mutex = GetMutex();
+      try
+      {
+        Mutex mutex = GetMutex();
 
-      mutex.WaitOne();
-      bool result = Count != 0 || EnqueueWaiters.Count != 0;
-      mutex.ReleaseMutex();
+        mutex.WaitOne();
+        bool result = Count != 0 || EnqueueWaiters.Count != 0;
+        mutex.ReleaseMutex();
 
-      return result;
+        return result;
+      }
+      catch
+      {
+        return false;
+      }
     }
   }
 

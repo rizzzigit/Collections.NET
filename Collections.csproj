@@ -23,15 +23,15 @@
     <Description>Extra collection implementations for .NET.</Description>
     <Product>Collections</Product>
     <Authors>RizzziGit</Authors>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
 
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
-    <FileVersion>1.0.2</FileVersion>
+    <FileVersion>1.0.3</FileVersion>
     <RepositoryUrl>https://github.com/RizzziGit/Collections.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>Use Mutex instead of locking an object.</PackageReleaseNotes>
+    <PackageReleaseNotes>Add support for .NET 6.0.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

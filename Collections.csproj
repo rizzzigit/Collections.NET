@@ -23,15 +23,15 @@
     <Description>Extra collection implementations for .NET.</Description>
     <Product>Collections</Product>
     <Authors>RizzziGit</Authors>
-    <Version>1.0.5</Version>
+    <Version>1.0.6</Version>
 
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
-    <FileVersion>1.0.5</FileVersion>
+    <FileVersion>1.0.6</FileVersion>
     <RepositoryUrl>https://github.com/RizzziGit/Collections.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>Wrap invalid operation exception.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fix proper exception not throwing.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

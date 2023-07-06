@@ -36,7 +36,22 @@ public class WaitQueue<T> : IDisposable
       throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
     }
 
-    return Collection.Take(cancellationToken ?? new(false));
+    try
+    {
+      return Collection.Take(cancellationToken ?? new(false));
+    }
+    catch (InvalidOperationException)
+    {
+      if (Collection.IsCompleted)
+      {
+        throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
+      } else if (Exception != null)
+      {
+        throw Exception;
+      }
+
+      throw;
+    }
   }
 
   public void Enqueue(T item) => Enqueue(item, null);

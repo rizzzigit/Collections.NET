@@ -42,12 +42,13 @@ public class WaitQueue<T> : IDisposable
     }
     catch (InvalidOperationException)
     {
-      if (Collection.IsCompleted)
-      {
-        throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
-      } else if (Exception != null)
+      if (Exception != null)
       {
         throw Exception;
+      }
+      else if (Collection.IsCompleted)
+      {
+        throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
       }
 
       throw;

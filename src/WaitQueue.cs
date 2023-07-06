@@ -2,159 +2,51 @@ using System.Collections.Concurrent;
 
 namespace RizzziGit.Collections;
 
-public class WaitQueue<T>
+public class WaitQueue<T> : IDisposable
 {
   public WaitQueue() : this(null) { }
   public WaitQueue(int? capacity)
   {
-    Capacity = capacity ?? -1;
-    Mutex = new();
-
-    Backlog = new();
-    DequeueWaiters = new();
-    EnqueueWaiters = new();
+    Collection = capacity != null ? new((int)capacity) : new();
   }
 
-  private Mutex? Mutex;
-  private Mutex GetMutex()
-  {
-    if (Mutex == null)
-    {
-      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
-    };
+  private Exception? Exception;
+  private BlockingCollection<T> Collection;
 
-    return Mutex;
-  }
+  public int Capacity => Collection.BoundedCapacity;
+  public int Count => Collection.Count;
 
-  private ConcurrentQueue<T> Backlog;
-  private ConcurrentQueue<TaskCompletionSource<T>> DequeueWaiters;
-  private ConcurrentQueue<TaskCompletionSource<TaskCompletionSource<T>>> EnqueueWaiters;
-
-  public int Capacity { get; private set; }
-  public int Count => Mutex != null ? Backlog.Count : 0;
-  public bool HasPending
-  {
-    get
-    {
-      try
-      {
-        Mutex mutex = GetMutex();
-
-        mutex.WaitOne();
-        bool result = Count != 0 || EnqueueWaiters.Count != 0;
-        mutex.ReleaseMutex();
-
-        return result;
-      }
-      catch
-      {
-        return false;
-      }
-    }
-  }
-
+  public void Dispose() => Dispose(null);
   public void Dispose(Exception? exception = null)
   {
-    Mutex mutex = GetMutex();
-    Mutex = null;
-
-    mutex.WaitOne();
-    while (DequeueWaiters.TryDequeue(out TaskCompletionSource<T>? dequeueWaiter))
-    {
-      if (exception != null)
-      {
-        dequeueWaiter.SetException(exception);
-      }
-      else
-      {
-        dequeueWaiter.SetCanceled();
-      }
-    }
-
-    while (EnqueueWaiters.TryDequeue(out TaskCompletionSource<TaskCompletionSource<T>>? enqueueWaiter))
-    {
-      if (exception != null)
-      {
-        enqueueWaiter.SetException(exception);
-      }
-      else
-      {
-        enqueueWaiter.SetCanceled();
-      }
-    }
-    mutex.Close();
-    Backlog.Clear();
+    Exception = exception;
+    Collection.CompleteAdding();
   }
 
-  public Task<T> DequeueAsync()
+  public T Dequeue() => Dequeue(null);
+  public T Dequeue(CancellationToken? cancellationToken)
   {
-    Mutex mutex = GetMutex();
-    TaskCompletionSource<T> source = new();
+    if (Collection.IsCompleted)
+    {
+      if (Exception != null)
+      {
+        throw Exception;
+      }
 
-    mutex.WaitOne();
-    if (Backlog.TryDequeue(out T? result) && (result != null))
-    {
-      source.SetResult(result);
+      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
     }
-    else if (EnqueueWaiters.TryDequeue(out TaskCompletionSource<TaskCompletionSource<T>>? enqueueWaiter) && (enqueueWaiter != null))
-    {
-      enqueueWaiter.SetResult(source);
-    }
-    else
-    {
-      DequeueWaiters.Enqueue(source);
-    }
-    mutex.ReleaseMutex();
 
-    return source.Task;
+    return Collection.Take(cancellationToken ?? new(false));
   }
 
-  public async Task EnqueueAsync(T item)
+  public void Enqueue(T item) => Enqueue(item, null);
+  public void Enqueue(T item, CancellationToken? cancellationToken)
   {
-    Mutex mutex = GetMutex();
-    TaskCompletionSource<TaskCompletionSource<T>>? enqueueSource = null;
-
-    mutex.WaitOne();
-    if (DequeueWaiters.TryDequeue(out TaskCompletionSource<T>? result) && (result != null))
+    if (Collection.IsAddingCompleted)
     {
-      result.SetResult(item);
+      throw new ObjectDisposedException(typeof(WaitQueue<T>).Name);
     }
-    else if ((Capacity >= 0) && (Backlog.Count >= Capacity))
-    {
-      EnqueueWaiters.Enqueue(enqueueSource = new());
-    }
-    else
-    {
-      Backlog.Enqueue(item);
-    }
-    mutex.ReleaseMutex();
 
-    if (enqueueSource != null)
-    {
-      (await enqueueSource.Task).SetResult(item);
-    }
-  }
-
-  public T Dequeue()
-  {
-    Task<T> task = DequeueAsync();
-
-    try { task.Wait(); } catch { }
-    return task.IsCompletedSuccessfully
-      ? task.Result
-      : throw task.Exception?.GetBaseException()
-        ?? throw new TaskCanceledException();
-  }
-
-  public void Enqueue(T item)
-  {
-    Task task = EnqueueAsync(item);
-
-    try { task.Wait(); } catch { }
-    if (!task.IsCompletedSuccessfully)
-    {
-      throw task.Exception?.GetBaseException()
-        ?? throw new TaskCanceledException();
-    }
+    Collection.Add(item, new(false));
   }
 }
